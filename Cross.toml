@@ -1,0 +1,68 @@
+# Cross-compilation configuration
+# This file ensures proper cross-compilation for all platforms
+
+[build]
+# Use newer cross images for better compatibility
+[build.env]
+passthrough = [
+    "RUST_BACKTRACE",
+    "CARGO_INCREMENTAL",
+    "CARGO_TERM_COLOR",
+]
+
+# Linux MUSL targets - use rustls instead of native-tls
+[target.x86_64-unknown-linux-musl]
+image = "ghcr.io/cross-rs/x86_64-unknown-linux-musl:latest"
+
+[target.aarch64-unknown-linux-musl]
+image = "ghcr.io/cross-rs/aarch64-unknown-linux-musl:latest"
+
+[target.armv7-unknown-linux-musleabihf]
+image = "ghcr.io/cross-rs/armv7-unknown-linux-musleabihf:latest"
+
+[target.arm-unknown-linux-musleabihf]
+image = "ghcr.io/cross-rs/arm-unknown-linux-musleabihf:latest"
+
+# ARM targets
+[target.aarch64-unknown-linux-gnu]
+image = "ghcr.io/cross-rs/aarch64-unknown-linux-gnu:latest"
+
+[target.armv7-unknown-linux-gnueabihf]
+image = "ghcr.io/cross-rs/armv7-unknown-linux-gnueabihf:latest"
+
+[target.arm-unknown-linux-gnueabihf]
+image = "ghcr.io/cross-rs/arm-unknown-linux-gnueabihf:latest"
+
+# RISC-V
+[target.riscv64gc-unknown-linux-gnu]
+image = "ghcr.io/cross-rs/riscv64gc-unknown-linux-gnu:latest"
+
+# PowerPC
+[target.powerpc64le-unknown-linux-gnu]
+image = "ghcr.io/cross-rs/powerpc64le-unknown-linux-gnu:latest"
+
+# MIPS
+[target.mips64el-unknown-linux-gnuabi64]
+image = "ghcr.io/cross-rs/mips64el-unknown-linux-gnuabi64:latest"
+
+# S390X
+[target.s390x-unknown-linux-gnu]
+image = "ghcr.io/cross-rs/s390x-unknown-linux-gnu:latest"
+
+# FreeBSD
+[target.x86_64-unknown-freebsd]
+image = "ghcr.io/cross-rs/x86_64-unknown-freebsd:latest"
+
+# NetBSD
+[target.x86_64-unknown-netbsd]
+image = "ghcr.io/cross-rs/x86_64-unknown-netbsd:latest"
+
+# Android
+[target.aarch64-linux-android]
+image = "ghcr.io/cross-rs/aarch64-linux-android:latest"
+
+[target.armv7-linux-androideabi]
+image = "ghcr.io/cross-rs/armv7-linux-androideabi:latest"
+
+[target.x86_64-linux-android]
+image = "ghcr.io/cross-rs/x86_64-linux-android:latest"

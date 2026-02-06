@@ -1,0 +1,83 @@
+# Cargo configuration for cross-platform builds
+
+[build]
+# Increase codegen units for faster development builds
+# Release builds will use codegen-units = 1 from Cargo.toml
+incremental = true
+
+[target.x86_64-unknown-linux-musl]
+linker = "x86_64-linux-musl-gcc"
+rustflags = ["-C", "target-feature=+crt-static"]
+
+[target.aarch64-unknown-linux-musl]
+linker = "aarch64-linux-musl-gcc"
+rustflags = ["-C", "target-feature=+crt-static"]
+
+[target.armv7-unknown-linux-musleabihf]
+linker = "armv7l-linux-musleabihf-gcc"
+rustflags = ["-C", "target-feature=+crt-static"]
+
+[target.arm-unknown-linux-musleabihf]
+linker = "arm-linux-musleabihf-gcc"
+rustflags = ["-C", "target-feature=+crt-static"]
+
+# Android targets
+[target.aarch64-linux-android]
+ar = "aarch64-linux-android-ar"
+linker = "aarch64-linux-android-clang"
+
+[target.armv7-linux-androideabi]
+ar = "arm-linux-androideabi-ar"
+linker = "armv7a-linux-androideabi-clang"
+
+[target.x86_64-linux-android]
+ar = "x86_64-linux-android-ar"
+linker = "x86_64-linux-android-clang"
+
+# Windows ARM64
+[target.aarch64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
+
+# macOS ARM64 (Apple Silicon)
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "link-arg=-mmacosx-version-min=11.0"]
+
+# FreeBSD
+[target.x86_64-unknown-freebsd]
+linker = "x86_64-unknown-freebsd-gcc"
+
+# NetBSD
+[target.x86_64-unknown-netbsd]
+linker = "x86_64-unknown-netbsd-gcc"
+
+# RISC-V
+[target.riscv64gc-unknown-linux-gnu]
+linker = "riscv64-linux-gnu-gcc"
+
+# PowerPC
+[target.powerpc64le-unknown-linux-gnu]
+linker = "powerpc64le-linux-gnu-gcc"
+
+# MIPS
+[target.mips64el-unknown-linux-gnuabi64]
+linker = "mips64el-linux-gnuabi64-gcc"
+
+# S390X
+[target.s390x-unknown-linux-gnu]
+linker = "s390x-linux-gnu-gcc"
+
+# Optimizations for all targets
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.dev]
+opt-level = 0
+debug = true
+
+# Network configuration
+[net]
+git-fetch-with-cli = true

@@ -1,0 +1,280 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+    steps:
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+
+  build-release:
+    name: Build Release
+    needs: create-release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux x86_64
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: speedtest
+            asset_name: speedtest-linux-amd64
+            cross: false
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            artifact_name: speedtest
+            asset_name: speedtest-linux-amd64-musl
+            cross: false
+          
+          # Linux x86 (32-bit)
+          - os: ubuntu-latest
+            target: i686-unknown-linux-gnu
+            artifact_name: speedtest
+            asset_name: speedtest-linux-i686
+            cross: true
+          - os: ubuntu-latest
+            target: i686-unknown-linux-musl
+            artifact_name: speedtest
+            asset_name: speedtest-linux-i686-musl
+            cross: true
+          
+          # Linux ARM64
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            artifact_name: speedtest
+            asset_name: speedtest-linux-arm64
+            cross: true
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-musl
+            artifact_name: speedtest
+            asset_name: speedtest-linux-arm64-musl
+            cross: true
+          
+          # Linux ARM (32-bit)
+          - os: ubuntu-latest
+            target: armv7-unknown-linux-gnueabihf
+            artifact_name: speedtest
+            asset_name: speedtest-linux-armv7
+            cross: true
+          - os: ubuntu-latest
+            target: armv7-unknown-linux-musleabihf
+            artifact_name: speedtest
+            asset_name: speedtest-linux-armv7-musl
+            cross: true
+          - os: ubuntu-latest
+            target: arm-unknown-linux-gnueabihf
+            artifact_name: speedtest
+            asset_name: speedtest-linux-armv6
+            cross: true
+          - os: ubuntu-latest
+            target: arm-unknown-linux-musleabihf
+            artifact_name: speedtest
+            asset_name: speedtest-linux-armv6-musl
+            cross: true
+          
+          # Linux RISC-V
+          - os: ubuntu-latest
+            target: riscv64gc-unknown-linux-gnu
+            artifact_name: speedtest
+            asset_name: speedtest-linux-riscv64
+            cross: true
+          
+          # Linux PowerPC
+          - os: ubuntu-latest
+            target: powerpc64le-unknown-linux-gnu
+            artifact_name: speedtest
+            asset_name: speedtest-linux-ppc64le
+            cross: true
+          
+          # Linux MIPS
+          - os: ubuntu-latest
+            target: mips64el-unknown-linux-gnuabi64
+            artifact_name: speedtest
+            asset_name: speedtest-linux-mips64el
+            cross: true
+          
+          # Linux S390X
+          - os: ubuntu-latest
+            target: s390x-unknown-linux-gnu
+            artifact_name: speedtest
+            asset_name: speedtest-linux-s390x
+            cross: true
+          
+          # Windows x86_64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: speedtest.exe
+            asset_name: speedtest-windows-amd64.exe
+            cross: false
+          - os: windows-latest
+            target: x86_64-pc-windows-gnu
+            artifact_name: speedtest.exe
+            asset_name: speedtest-windows-amd64-gnu.exe
+            cross: false
+          
+          # Windows x86 (32-bit)
+          - os: windows-latest
+            target: i686-pc-windows-msvc
+            artifact_name: speedtest.exe
+            asset_name: speedtest-windows-i686.exe
+            cross: false
+          
+          # Windows ARM64
+          - os: windows-latest
+            target: aarch64-pc-windows-msvc
+            artifact_name: speedtest.exe
+            asset_name: speedtest-windows-arm64.exe
+            cross: false
+          
+          # macOS x86_64
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: speedtest
+            asset_name: speedtest-macos-amd64
+            cross: false
+          
+          # macOS ARM64 (Apple Silicon)
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: speedtest
+            asset_name: speedtest-macos-arm64
+            cross: false
+          
+          # FreeBSD
+          - os: ubuntu-latest
+            target: x86_64-unknown-freebsd
+            artifact_name: speedtest
+            asset_name: speedtest-freebsd-amd64
+            cross: true
+          
+          # NetBSD
+          - os: ubuntu-latest
+            target: x86_64-unknown-netbsd
+            artifact_name: speedtest
+            asset_name: speedtest-netbsd-amd64
+            cross: true
+          
+          # Android
+          - os: ubuntu-latest
+            target: aarch64-linux-android
+            artifact_name: speedtest
+            asset_name: speedtest-android-arm64
+            cross: true
+          - os: ubuntu-latest
+            target: armv7-linux-androideabi
+            artifact_name: speedtest
+            asset_name: speedtest-android-armv7
+            cross: true
+          - os: ubuntu-latest
+            target: x86_64-linux-android
+            artifact_name: speedtest
+            asset_name: speedtest-android-amd64
+            cross: true
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          target: ${{ matrix.target }}
+
+      - name: Install cross-compilation tools
+        if: matrix.cross
+        run: |
+          cargo install cross --git https://github.com/cross-rs/cross
+
+      - name: Install musl tools
+        if: contains(matrix.target, 'musl') && !matrix.cross
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+
+      - name: Build with cargo
+        if: "!matrix.cross"
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Build with cross
+        if: matrix.cross
+        run: cross build --release --target ${{ matrix.target }}
+
+      - name: Strip binary (Unix)
+        if: matrix.os != 'windows-latest' && !matrix.cross
+        run: strip target/${{ matrix.target }}/release/${{ matrix.artifact_name }}
+
+      - name: Compress binary (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          cd target/${{ matrix.target }}/release
+          tar -czf ${{ matrix.asset_name }}.tar.gz ${{ matrix.artifact_name }}
+          mv ${{ matrix.asset_name }}.tar.gz ../../..
+
+      - name: Compress binary (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          cd target/${{ matrix.target }}/release
+          7z a ${{ matrix.asset_name }}.zip ${{ matrix.artifact_name }}
+          move ${{ matrix.asset_name }}.zip ../../..
+
+      - name: Upload Release Asset (Unix)
+        if: matrix.os != 'windows-latest'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./${{ matrix.asset_name }}.tar.gz
+          asset_name: ${{ matrix.asset_name }}.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload Release Asset (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./${{ matrix.asset_name }}.zip
+          asset_name: ${{ matrix.asset_name }}.zip
+          asset_content_type: application/zip
+
+  publish-crates:
+    name: Publish to crates.io
+    needs: build-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Publish to crates.io
+        run: cargo publish --token ${{ secrets.CARGO_TOKEN }}
+        continue-on-error: true
