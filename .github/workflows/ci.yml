@@ -8,15 +8,47 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
 
 jobs:
+  # Format and lint checks - MUST pass
+  check:
+    name: Check Code Quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+      
+      - name: Check formatting
+        run: cargo fmt -- --check
+      
+      - name: Run clippy
+        run: cargo clippy --all-features --all-targets -- -D warnings
+        # -D warnings means: treat warnings as errors!
+      
+      - name: Check documentation
+        run: cargo doc --no-deps --all-features
+        env:
+          RUSTDOCFLAGS: -D warnings
+
+  # Primary platform tests - MUST all pass
   test:
-    name: Test
+    name: Test (${{ matrix.os }}, Rust ${{ matrix.rust }})
+    needs: check  # Only run tests after code quality checks pass
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: true  # STOP on first failure!
       matrix:
-        os: [ubuntu-latest, windows-latest, macOS-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
         rust: [stable, beta]
+        # Nightly is tested separately as it's allowed to fail
     steps:
       - uses: actions/checkout@v3
       
@@ -26,40 +58,134 @@ jobs:
           profile: minimal
           toolchain: ${{ matrix.rust }}
           override: true
-          components: rustfmt, clippy
       
       - name: Cache cargo registry
         uses: actions/cache@v3
         with:
           path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-${{ matrix.rust }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
       
       - name: Cache cargo index
         uses: actions/cache@v3
         with:
           path: ~/.cargo/git
-          key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-${{ matrix.rust }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
       
       - name: Cache cargo build
         uses: actions/cache@v3
         with:
           path: target
-          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-${{ matrix.rust }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
       
-      - name: Check formatting
-        run: cargo fmt -- --check
+      - name: Build
+        run: cargo build --verbose --all-features
       
-      - name: Run clippy
-        run: cargo clippy --all-features -- -D warnings
+      - name: Run tests
+        run: cargo test --verbose --all-features -- --nocapture
+      
+      - name: Build release
+        run: cargo build --release --verbose
+
+  # Nightly tests - allowed to fail
+  test-nightly:
+    name: Test (Nightly)
+    needs: check
+    runs-on: ubuntu-latest
+    continue-on-error: true  # Nightly can fail
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install Rust Nightly
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
       
       - name: Run tests
         run: cargo test --verbose
+
+  # Additional platform targets
+  test-targets:
+    name: Test Target (${{ matrix.target }})
+    needs: check
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true  # Stop on first failure
+      matrix:
+        target:
+          - x86_64-unknown-linux-musl
+          - i686-unknown-linux-gnu
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          target: ${{ matrix.target }}
+      
+      - name: Install musl tools
+        if: contains(matrix.target, 'musl')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
       
       - name: Build
-        run: cargo build --verbose --release
+        run: cargo build --release --target ${{ matrix.target }} --verbose
+      
+      - name: Verify binary
+        run: |
+          if [ ! -f "target/${{ matrix.target }}/release/speedtest" ]; then
+            echo "ERROR: Binary not found!"
+            exit 1
+          fi
+          file target/${{ matrix.target }}/release/speedtest
 
+  # Cross-compile tests - individual failures don't block
+  cross-compile-test:
+    name: Cross Test (${{ matrix.target }})
+    needs: test  # Only run after main tests pass
+    runs-on: ubuntu-latest
+    continue-on-error: true  # Exotic platforms can fail
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - aarch64-unknown-linux-gnu
+          - armv7-unknown-linux-gnueabihf
+          - riscv64gc-unknown-linux-gnu
+          - powerpc64le-unknown-linux-gnu
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          target: ${{ matrix.target }}
+      
+      - name: Install cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
+      
+      - name: Build with cross
+        run: cross build --release --target ${{ matrix.target }} --verbose
+      
+      - name: Verify binary
+        run: |
+          if [ ! -f "target/${{ matrix.target }}/release/speedtest" ]; then
+            echo "WARNING: Binary not found for ${{ matrix.target }}"
+            exit 1
+          fi
+
+  # Code coverage
   coverage:
     name: Code Coverage
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -74,13 +200,53 @@ jobs:
       - name: Run cargo-tarpaulin
         uses: actions-rs/tarpaulin@v0.1
         with:
-          args: '--ignore-tests'
+          args: '--ignore-tests --out Lcov'
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./lcov.info
+          fail_ci_if_error: false  # Don't fail CI if codecov upload fails
 
+  # Security audit
   security_audit:
     name: Security Audit
+    needs: check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      
       - uses: actions-rs/audit-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+
+  # Minimal versions check
+  minimal-versions:
+    name: Minimal Versions Check
+    needs: test
+    runs-on: ubuntu-latest
+    continue-on-error: true  # This is experimental
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install Rust Nightly
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+      
+      - name: Install cargo-minimal-versions
+        run: cargo install cargo-minimal-versions
+      
+      - name: Check minimal versions
+        run: cargo minimal-versions check
+
+  # Final status check
+  ci-success:
+    name: CI Success
+    needs: [check, test, test-targets, coverage, security_audit]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mark CI as successful
+        run: echo "All required CI checks passed!"
