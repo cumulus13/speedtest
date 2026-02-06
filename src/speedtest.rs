@@ -3,18 +3,15 @@ use crate::http::HttpClient;
 use crate::types::*;
 use crate::utils;
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Arc;
-use std::time::{Duration, Instant};
 
 pub struct Speedtest {
-    config: Option<Config>,
-    http_client: HttpClient,
-    servers: HashMap<String, Vec<Server>>,
-    closest: Vec<Server>,
-    best: Option<Server>,
-    results: SpeedtestResults,
-    lat_lon: Option<(f64, f64)>,
+    pub(crate) config: Option<Config>,
+    pub(crate) http_client: HttpClient,
+    pub(crate) servers: HashMap<String, Vec<Server>>,
+    pub(crate) closest: Vec<Server>,
+    pub(crate) best: Option<Server>,
+    pub(crate) results: SpeedtestResults,
+    pub(crate) lat_lon: Option<(f64, f64)>,
 }
 
 impl Speedtest {

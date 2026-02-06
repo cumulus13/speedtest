@@ -40,7 +40,8 @@ impl Speedtest {
                 match self.http_client.get_text(&latency_url) {
                     Ok(response) => {
                         let elapsed = start.elapsed();
-                        if response.trim() == "test=test" {
+                        let response_str: String = response;
+                        if response_str.trim() == "test=test" {
                             cumulative.push(elapsed.as_secs_f64());
                         } else {
                             cumulative.push(3600.0);
@@ -81,7 +82,7 @@ impl Speedtest {
         Ok(self.best.as_ref().unwrap())
     }
 
-    fn extract_base_url(&self, url: &str) -> String {
+    pub(crate) fn extract_base_url(&self, url: &str) -> String {
         if let Some(pos) = url.rfind('/') {
             url[..pos].to_string()
         } else {

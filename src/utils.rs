@@ -1,11 +1,3 @@
-// File: src\utils.rs
-// Author: Hadi Cahyadi <cumulus13@gmail.com>
-// Date: 2026-02-06
-// Description: 
-// License: MIT
-
-use std::f64::consts::PI;
-
 /// Calculate distance between two coordinates using Haversine formula
 pub fn distance(origin: (f64, f64), destination: (f64, f64)) -> f64 {
     let (lat1, lon1) = origin;
@@ -25,7 +17,7 @@ pub fn distance(origin: (f64, f64), destination: (f64, f64)) -> f64 {
 /// Build a User-Agent string
 pub fn build_user_agent() -> String {
     format!(
-        "Mozilla/5.0 ({}) speedtest/{}",
+        "Mozilla/5.0 ({}) speedtest-rs/{}",
         std::env::consts::OS,
         env!("CARGO_PKG_VERSION")
     )

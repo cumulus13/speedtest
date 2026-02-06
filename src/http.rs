@@ -1,4 +1,4 @@
-use crate::error::{Result, SpeedtestError};
+use crate::error::Result;
 use crate::utils;
 use reqwest::blocking::{Client, ClientBuilder, Response};
 use std::time::Duration;
@@ -9,8 +9,8 @@ pub struct HttpClient {
 }
 
 impl HttpClient {
-    pub fn new(timeout: u64, source_address: Option<String>, secure: bool) -> Result<Self> {
-        let mut builder = ClientBuilder::new()
+    pub fn new(timeout: u64, _source_address: Option<String>, secure: bool) -> Result<Self> {
+        let builder = ClientBuilder::new()
             .timeout(Duration::from_secs(timeout))
             .user_agent(utils::build_user_agent())
             .gzip(true)

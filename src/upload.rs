@@ -117,12 +117,10 @@ fn generate_upload_data_static(length: usize) -> Vec<u8> {
 
     let pattern: Vec<u8> = CHARS.iter().cycle().take(multiplier).copied().collect();
 
-    let mut pos = 0;
     while data.len() < length {
         let remaining = content_length - (data.len() - 9);
         let chunk_size = remaining.min(pattern.len());
         data.extend_from_slice(&pattern[..chunk_size]);
-        pos += chunk_size;
     }
 
     // Ensure exact length

@@ -5,3 +5,5 @@
 
 # Added entries (1 items)
 temp/
+# PT backup directory
+.pt/

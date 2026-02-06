@@ -6,7 +6,8 @@ impl Speedtest {
     /// Share results to speedtest.net and get share URL
     pub fn share_results(&mut self) -> Result<String> {
         if let Some(ref share_url) = self.results.share {
-            return Ok(share_url.clone());
+            let url: String = share_url.clone();
+            return Ok(url);
         }
 
         let download = (self.results.download / 1000.0).round() as u64;
@@ -45,7 +46,7 @@ impl Speedtest {
                 "://www.speedtest.net/api/api.php",
                 post_data.into_bytes(),
             )
-            .map_err(|e| SpeedtestError::ShareResultsConnectFailure(e.to_string()))?;
+            .map_err(|e: reqwest::Error| SpeedtestError::ShareResultsConnectFailure(e.to_string()))?;
 
         if !response.status().is_success() {
             return Err(SpeedtestError::ShareResultsSubmitFailure(
@@ -55,7 +56,7 @@ impl Speedtest {
 
         let response_text = response
             .text()
-            .map_err(|e| SpeedtestError::ShareResultsSubmitFailure(e.to_string()))?;
+            .map_err(|e: reqwest::Error| SpeedtestError::ShareResultsSubmitFailure(e.to_string()))?;
 
         // Parse result ID from response
         let params: HashMap<String, String> = url::form_urlencoded::parse(response_text.as_bytes())

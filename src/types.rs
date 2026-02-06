@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Client information from speedtest configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
