@@ -5,6 +5,10 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+  packages: write
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -12,289 +16,217 @@ jobs:
   create-release:
     name: Create Release
     runs-on: ubuntu-latest
-    outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
-      release_id: ${{ steps.create_release.outputs.id }}
+    permissions:
+      contents: write
     steps:
+      - uses: actions/checkout@v3
+      
       - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          draft: true  # Changed to draft - will be published after all builds succeed
+          draft: false
           prerelease: false
+          generate_release_notes: true
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-  # Tier 1 platforms - MUST succeed
-  build-tier1:
-    name: Build Tier 1 (${{ matrix.target }})
+  build-release:
+    name: Build (${{ matrix.asset_name }})
     needs: create-release
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
     strategy:
-      fail-fast: true  # STOP if any Tier 1 build fails!
+      fail-fast: false
       matrix:
         include:
-          # Tier 1: Must work platforms
+          # Linux x86_64
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             artifact_name: speedtest
             asset_name: speedtest-linux-amd64
+            cross: false
           - os: ubuntu-latest
             target: x86_64-unknown-linux-musl
             artifact_name: speedtest
             asset_name: speedtest-linux-amd64-musl
+            cross: false
+          
+          # Linux x86 (32-bit)
+          - os: ubuntu-latest
+            target: i686-unknown-linux-gnu
+            artifact_name: speedtest
+            asset_name: speedtest-linux-i686
+            cross: true
+          - os: ubuntu-latest
+            target: i686-unknown-linux-musl
+            artifact_name: speedtest
+            asset_name: speedtest-linux-i686-musl
+            cross: true
+          
+          # Linux ARM64
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            artifact_name: speedtest
+            asset_name: speedtest-linux-arm64
+            cross: true
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-musl
+            artifact_name: speedtest
+            asset_name: speedtest-linux-arm64-musl
+            cross: true
+          
+          # Linux ARM (32-bit)
+          - os: ubuntu-latest
+            target: armv7-unknown-linux-gnueabihf
+            artifact_name: speedtest
+            asset_name: speedtest-linux-armv7
+            cross: true
+          - os: ubuntu-latest
+            target: armv7-unknown-linux-musleabihf
+            artifact_name: speedtest
+            asset_name: speedtest-linux-armv7-musl
+            cross: true
+          - os: ubuntu-latest
+            target: arm-unknown-linux-gnueabihf
+            artifact_name: speedtest
+            asset_name: speedtest-linux-armv6
+            cross: true
+          
+          # Linux RISC-V
+          - os: ubuntu-latest
+            target: riscv64gc-unknown-linux-gnu
+            artifact_name: speedtest
+            asset_name: speedtest-linux-riscv64
+            cross: true
+          
+          # Linux PowerPC
+          - os: ubuntu-latest
+            target: powerpc64le-unknown-linux-gnu
+            artifact_name: speedtest
+            asset_name: speedtest-linux-ppc64le
+            cross: true
+          
+          # Windows x86_64
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             artifact_name: speedtest.exe
             asset_name: speedtest-windows-amd64.exe
+            cross: false
+          - os: windows-latest
+            target: x86_64-pc-windows-gnu
+            artifact_name: speedtest.exe
+            asset_name: speedtest-windows-amd64-gnu.exe
+            cross: false
+          
+          # Windows x86 (32-bit)
+          - os: windows-latest
+            target: i686-pc-windows-msvc
+            artifact_name: speedtest.exe
+            asset_name: speedtest-windows-i686.exe
+            cross: false
+          
+          # Windows ARM64
+          - os: windows-latest
+            target: aarch64-pc-windows-msvc
+            artifact_name: speedtest.exe
+            asset_name: speedtest-windows-arm64.exe
+            cross: false
+          
+          # macOS x86_64
           - os: macos-latest
             target: x86_64-apple-darwin
             artifact_name: speedtest
             asset_name: speedtest-macos-amd64
+            cross: false
+          
+          # macOS ARM64 (Apple Silicon)
           - os: macos-latest
             target: aarch64-apple-darwin
             artifact_name: speedtest
             asset_name: speedtest-macos-arm64
+            cross: false
+          
+          # FreeBSD
+          - os: ubuntu-latest
+            target: x86_64-unknown-freebsd
+            artifact_name: speedtest
+            asset_name: speedtest-freebsd-amd64
+            cross: true
+          
+          # Android
+          - os: ubuntu-latest
+            target: aarch64-linux-android
+            artifact_name: speedtest
+            asset_name: speedtest-android-arm64
+            cross: true
+          - os: ubuntu-latest
+            target: armv7-linux-androideabi
+            artifact_name: speedtest
+            asset_name: speedtest-android-armv7
+            cross: true
 
     steps:
       - uses: actions/checkout@v3
 
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
         with:
-          profile: minimal
-          toolchain: stable
-          override: true
-          target: ${{ matrix.target }}
+          targets: ${{ matrix.target }}
+
+      - name: Install cross-compilation tools
+        if: matrix.cross
+        run: |
+          cargo install cross --git https://github.com/cross-rs/cross
 
       - name: Install musl tools
-        if: contains(matrix.target, 'musl')
+        if: contains(matrix.target, 'musl') && !matrix.cross
         run: |
           sudo apt-get update
           sudo apt-get install -y musl-tools
 
-      - name: Build
-        run: cargo build --release --target ${{ matrix.target }} --verbose
-
-      - name: Run tests
-        run: cargo test --release --target ${{ matrix.target }}
-
-      - name: Verify binary exists
-        shell: bash
-        run: |
-          if [ ! -f "target/${{ matrix.target }}/release/${{ matrix.artifact_name }}" ]; then
-            echo "ERROR: Binary not found!"
-            exit 1
-          fi
-
-      - name: Strip binary (Unix)
-        if: matrix.os != 'windows-latest'
-        run: strip target/${{ matrix.target }}/release/${{ matrix.artifact_name }}
-
-      - name: Compress binary (Unix)
-        if: matrix.os != 'windows-latest'
-        run: |
-          cd target/${{ matrix.target }}/release
-          tar -czf ${{ matrix.asset_name }}.tar.gz ${{ matrix.artifact_name }}
-          mv ${{ matrix.asset_name }}.tar.gz ../../..
-
-      - name: Compress binary (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          cd target/${{ matrix.target }}/release
-          7z a ${{ matrix.asset_name }}.zip ${{ matrix.artifact_name }}
-          move ${{ matrix.asset_name }}.zip ../../..
-
-      - name: Upload Release Asset (Unix)
-        if: matrix.os != 'windows-latest'
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./${{ matrix.asset_name }}.tar.gz
-          asset_name: ${{ matrix.asset_name }}.tar.gz
-          asset_content_type: application/gzip
-
-      - name: Upload Release Asset (Windows)
-        if: matrix.os == 'windows-latest'
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./${{ matrix.asset_name }}.zip
-          asset_name: ${{ matrix.asset_name }}.zip
-          asset_content_type: application/zip
-
-  # Tier 2 platforms - Can fail individually but won't block release
-  build-tier2:
-    name: Build Tier 2 (${{ matrix.target }})
-    needs: [create-release, build-tier1]  # Only run after Tier 1 succeeds
-    runs-on: ubuntu-latest
-    continue-on-error: true  # Individual Tier 2 failures don't block release
-    strategy:
-      fail-fast: false
-      matrix:
-        target:
-          # Linux variants
-          - i686-unknown-linux-gnu
-          - i686-unknown-linux-musl
-          - aarch64-unknown-linux-gnu
-          - aarch64-unknown-linux-musl
-          - armv7-unknown-linux-gnueabihf
-          - armv7-unknown-linux-musleabihf
-          - arm-unknown-linux-gnueabihf
-          - arm-unknown-linux-musleabihf
-          # Exotic architectures
-          - riscv64gc-unknown-linux-gnu
-          - powerpc64le-unknown-linux-gnu
-          - mips64el-unknown-linux-gnuabi64
-          - s390x-unknown-linux-gnu
-          # BSD
-          - x86_64-unknown-freebsd
-          - x86_64-unknown-netbsd
-          # Android
-          - aarch64-linux-android
-          - armv7-linux-androideabi
-          - x86_64-linux-android
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-          target: ${{ matrix.target }}
-
-      - name: Install cross
-        run: cargo install cross --git https://github.com/cross-rs/cross
+      - name: Build with cargo
+        if: "!matrix.cross"
+        run: cargo build --release --target ${{ matrix.target }}
 
       - name: Build with cross
-        run: cross build --release --target ${{ matrix.target }} --verbose
+        if: matrix.cross
+        run: cross build --release --target ${{ matrix.target }}
 
-      - name: Verify binary
-        run: |
-          if [ ! -f "target/${{ matrix.target }}/release/speedtest" ]; then
-            echo "ERROR: Binary not found for ${{ matrix.target }}"
-            exit 1
-          fi
-          file target/${{ matrix.target }}/release/speedtest
+      - name: Strip binary (Unix)
+        if: matrix.os != 'windows-latest' && !matrix.cross
+        run: strip target/${{ matrix.target }}/release/${{ matrix.artifact_name }} || true
 
-      - name: Compress binary
+      - name: Create archive (Unix)
+        if: matrix.os != 'windows-latest'
         run: |
           cd target/${{ matrix.target }}/release
-          tar -czf speedtest-${{ matrix.target }}.tar.gz speedtest
-          mv speedtest-${{ matrix.target }}.tar.gz ../../..
+          tar -czf ../../../${{ matrix.asset_name }}.tar.gz ${{ matrix.artifact_name }}
 
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./speedtest-${{ matrix.target }}.tar.gz
-          asset_name: speedtest-${{ matrix.target }}.tar.gz
-          asset_content_type: application/gzip
-
-  # Windows additional targets
-  build-windows-extra:
-    name: Build Windows Extra (${{ matrix.target }})
-    needs: [create-release, build-tier1]
-    runs-on: windows-latest
-    continue-on-error: true
-    strategy:
-      matrix:
-        target:
-          - x86_64-pc-windows-gnu
-          - i686-pc-windows-msvc
-          - aarch64-pc-windows-msvc
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-          target: ${{ matrix.target }}
-
-      - name: Build
-        run: cargo build --release --target ${{ matrix.target }} --verbose
-
-      - name: Verify binary
-        run: |
-          if (!(Test-Path "target/${{ matrix.target }}/release/speedtest.exe")) {
-            Write-Error "Binary not found!"
-            exit 1
-          }
-
-      - name: Compress binary
+      - name: Create archive (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
         run: |
           cd target/${{ matrix.target }}/release
-          7z a speedtest-${{ matrix.target }}.zip speedtest.exe
-          move speedtest-${{ matrix.target }}.zip ../../..
+          Compress-Archive -Path ${{ matrix.artifact_name }} -DestinationPath ../../../${{ matrix.asset_name }}.zip
 
       - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v1
         with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./speedtest-${{ matrix.target }}.zip
-          asset_name: speedtest-${{ matrix.target }}.zip
-          asset_content_type: application/zip
+          files: |
+            ${{ matrix.asset_name }}.*
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-  # Publish to crates.io only after ALL Tier 1 builds succeed
   publish-crates:
     name: Publish to crates.io
-    needs: [build-tier1, build-tier2, build-windows-extra]
+    needs: build-release
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     steps:
       - uses: actions/checkout@v3
 
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-
-      - name: Dry run publish
-        run: cargo publish --dry-run --token ${{ secrets.CARGO_TOKEN }}
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Publish to crates.io
         run: cargo publish --token ${{ secrets.CARGO_TOKEN }}
-        # NO continue-on-error! We want to know if publish fails!
-
-  # Mark release as non-draft after everything succeeds
-  finalize-release:
-    name: Finalize Release
-    needs: [publish-crates]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Mark release as published
-        uses: eregon/publish-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          release_id: ${{ needs.create-release.outputs.release_id }}
-
-  # Notify on failure
-  notify-failure:
-    name: Notify on Failure
-    needs: [build-tier1, publish-crates]
-    if: failure()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Send notification
-        run: |
-          echo "::error::Release build failed! Check the logs above."
-          exit 1
+        continue-on-error: true
