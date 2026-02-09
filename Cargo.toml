@@ -4,8 +4,8 @@ bin = [
 ]
 
 [package]
-name = "speed-test"
-version = "1.0.6"
+name = "speedtester"
+version = "1.0.7"
 authors = [
     "Hadi Cahyadi <cumulus13@gmail.com>",
 ]
