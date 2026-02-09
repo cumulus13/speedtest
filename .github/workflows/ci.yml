@@ -60,6 +60,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
+          components: rustfmt, clippy
       
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -79,8 +80,12 @@ jobs:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
       
+      - name: Build
+        run: cargo build --verbose
+
       - name: Run tests
         run: cargo test --verbose --all-features
+        continue-on-error: false
       
       - name: Run doc tests
         run: cargo test --doc
