@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  speedtest:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: speedtest
+    network_mode: host
+    command: ["--json"]
+    
+  # Service for simple speedtest
+  speedtest-simple:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: speedtest-simple
+    network_mode: host
+    command: ["--simple"]
+    
+  # Service for CSV output
+  speedtest-csv:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: speedtest-csv
+    network_mode: host
+    command: ["--csv"]

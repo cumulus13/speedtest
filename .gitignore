@@ -1,0 +1,50 @@
+# Rust
+/target/
+**/*.rs.bk
+*.pdb
+Cargo.lock
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Testing
+*.profraw
+*.profdata
+
+# Backup files
+*.bak
+*.tmp
+# PT backup directory
+.pt/
+
+# Added entries (1 items)
+*sublime*
+
+# Added entries (4 items)
+xml-output.txt
+temp/
+test/
+build.bat
+
+# Added entries (1 items)
+FIXES.md
+
+# Added entries (1 items)
+STRUCTURE.txt
+
+# Added entries (1 items)
+TESTING.md
