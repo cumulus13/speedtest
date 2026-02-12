@@ -5,7 +5,7 @@ bin = [
 
 [package]
 name = "speedtester"
-version = "1.0.8"
+version = "1.0.9"
 authors = [
     "Hadi Cahyadi <cumulus13@gmail.com>",
 ]
@@ -58,7 +58,6 @@ features = [
     "blocking",
     "gzip",
     "json",
-    "rustls-tls",
 ]
 
 [dependencies.tokio]

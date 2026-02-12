@@ -500,6 +500,14 @@ impl Speedtest {
             }
         }
 
+        if self.debug {
+            eprintln!("Download test configuration:");
+            eprintln!("  Base URL: {}", base_url);
+            eprintln!("  Total URLs: {}", urls.len());
+            eprintln!("  Threads: {}", threads.unwrap_or(config.threads.download));
+            eprintln!("  Test duration: {} seconds", config.length.download);
+        }
+
         let max_threads = threads.unwrap_or(config.threads.download);
         let test_duration = Duration::from_secs(config.length.download);
         
@@ -518,8 +526,9 @@ impl Speedtest {
                 std::thread::spawn(move || {
                     let mut url_index = 0;
                     while !stop_flag.load(Ordering::Relaxed) {
+                        // Loop back to start when we reach the end
                         if url_index >= urls.len() {
-                            break;
+                            url_index = 0;
                         }
                         
                         if let Ok(data) = client.get_bytes(&urls[url_index]) {
@@ -544,6 +553,13 @@ impl Speedtest {
         let bytes = total_bytes.load(Ordering::Relaxed);
         let speed = (bytes as f64 / elapsed) * 8.0;
 
+        if self.debug {
+            eprintln!("Download test results:");
+            eprintln!("  Bytes downloaded: {}", bytes);
+            eprintln!("  Time elapsed: {:.2} seconds", elapsed);
+            eprintln!("  Speed: {:.2} bits/s ({:.2} Mbit/s)", speed, speed / 1_000_000.0);
+        }
+
         Ok(speed)
     }
 
@@ -561,6 +577,14 @@ impl Speedtest {
             for _ in 0..config.counts.upload {
                 sizes.push(*size);
             }
+        }
+
+        if self.debug {
+            eprintln!("Upload test configuration:");
+            eprintln!("  Server URL: {}", server.url);
+            eprintln!("  Total data chunks: {}", sizes.len());
+            eprintln!("  Threads: {}", threads.unwrap_or(config.threads.upload));
+            eprintln!("  Test duration: {} seconds", config.length.upload);
         }
 
         let max_threads = threads.unwrap_or(config.threads.upload);
@@ -592,10 +616,16 @@ impl Speedtest {
                 
                 std::thread::spawn(move || {
                     let mut data_index = i;
-                    while !stop_flag.load(Ordering::Relaxed) && data_index < data_chunk.len() {
+                    while !stop_flag.load(Ordering::Relaxed) {
+                        // Loop back to start when we reach the end
+                        if data_index >= data_chunk.len() {
+                            data_index = i; // Start from this thread's offset again
+                        }
+                        
                         if let Ok(_) = client.post(&url, data_chunk[data_index].clone()) {
                             total_bytes.fetch_add(data_chunk[data_index].len() as u64, Ordering::Relaxed);
                         }
+                        
                         data_index += max_threads;
                     }
                 })
@@ -614,6 +644,13 @@ impl Speedtest {
         let bytes = total_bytes.load(Ordering::Relaxed);
         let speed = (bytes as f64 / elapsed) * 8.0;
 
+        if self.debug {
+            eprintln!("Upload test results:");
+            eprintln!("  Bytes uploaded: {}", bytes);
+            eprintln!("  Time elapsed: {:.2} seconds", elapsed);
+            eprintln!("  Speed: {:.2} bits/s ({:.2} Mbit/s)", speed, speed / 1_000_000.0);
+        }
+
         Ok(speed)
     }
 
@@ -628,7 +665,7 @@ impl Speedtest {
     }
 }
 
-// use crate::utils::cache_buster;
+use crate::utils::cache_buster;
 
 #[cfg(test)]
 mod tests {
