@@ -24,40 +24,23 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        rust: [stable, beta]
-        include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-          - os: macos-latest
-            target: x86_64-apple-darwin
+        rust: [stable]
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ matrix.rust }}
-          targets: ${{ matrix.target }}
 
-      - name: Cache cargo registry
+      - name: Cache dependencies
         uses: actions/cache@v4
         with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Cache cargo index
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/git
-          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Cache cargo build
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Run tests
         run: cargo test --verbose --all-features
@@ -69,13 +52,22 @@ jobs:
   release:
     name: Create Release
     runs-on: ubuntu-latest
-    # Only create releases for version tags (v*) or manual dispatch
+    # Only runs for v* tags or manual dispatch
     if: ${{ startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' }}
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
-      tag_name: ${{ steps.create_release.outputs.tag_name }}
+      tag_name: ${{ github.ref_name }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Determine prerelease status
+        id: prerelease
+        run: |
+          if [[ "${{ github.ref_name }}" =~ -(alpha|beta|rc|dev) ]]; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Create Release
         id: create_release
@@ -83,74 +75,60 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           draft: false
-          prerelease: ${{ contains(github.ref_name, '-alpha') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-rc') }}
+          prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build:
-    name: Build ${{ matrix.asset_name }}
+    name: Build ${{ matrix.name }}
     needs: release
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          # Linux builds
+          # Linux x86_64 (glibc)
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            artifact_name: speedtest
-            asset_name: speedtest-linux-x86_64
+            name: Linux x86_64 (glibc)
+            artifact: speedtest
+            asset: speedtest-linux-x86_64
+          
+          # Linux x86_64 (musl - static)
           - os: ubuntu-latest
             target: x86_64-unknown-linux-musl
-            artifact_name: speedtest
-            asset_name: speedtest-linux-x86_64-musl
+            name: Linux x86_64 (musl)
+            artifact: speedtest
+            asset: speedtest-linux-x86_64-musl
+          
+          # Linux ARM64
           - os: ubuntu-latest
             target: aarch64-unknown-linux-gnu
-            artifact_name: speedtest
-            asset_name: speedtest-linux-aarch64
-          - os: ubuntu-latest
-            target: armv7-unknown-linux-gnueabihf
-            artifact_name: speedtest
-            asset_name: speedtest-linux-armv7
-          - os: ubuntu-latest
-            target: i686-unknown-linux-gnu
-            artifact_name: speedtest
-            asset_name: speedtest-linux-i686
+            name: Linux ARM64
+            artifact: speedtest
+            asset: speedtest-linux-aarch64
           
-          # Windows builds
+          # Windows x86_64
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            artifact_name: speedtest.exe
-            asset_name: speedtest-windows-x86_64.exe
-          - os: windows-latest
-            target: i686-pc-windows-msvc
-            artifact_name: speedtest.exe
-            asset_name: speedtest-windows-i686.exe
-          - os: windows-latest
-            target: aarch64-pc-windows-msvc
-            artifact_name: speedtest.exe
-            asset_name: speedtest-windows-aarch64.exe
+            name: Windows x86_64
+            artifact: speedtest.exe
+            asset: speedtest-windows-x86_64.exe
           
-          # macOS builds
+          # macOS Intel
           - os: macos-latest
             target: x86_64-apple-darwin
-            artifact_name: speedtest
-            asset_name: speedtest-macos-x86_64
+            name: macOS Intel
+            artifact: speedtest
+            asset: speedtest-macos-x86_64
+          
+          # macOS Apple Silicon
           - os: macos-latest
             target: aarch64-apple-darwin
-            artifact_name: speedtest
-            asset_name: speedtest-macos-aarch64
-          
-          # BSD builds
-          - os: ubuntu-latest
-            target: x86_64-unknown-freebsd
-            artifact_name: speedtest
-            asset_name: speedtest-freebsd-x86_64
-          - os: ubuntu-latest
-            target: x86_64-unknown-netbsd
-            artifact_name: speedtest
-            asset_name: speedtest-netbsd-x86_64
+            name: macOS Apple Silicon
+            artifact: speedtest
+            asset: speedtest-macos-aarch64
 
     steps:
       - uses: actions/checkout@v4
@@ -161,93 +139,63 @@ jobs:
           toolchain: stable
           targets: ${{ matrix.target }}
 
-      - name: Install musl-tools (for musl target)
+      - name: Install musl-tools (Linux musl only)
         if: matrix.target == 'x86_64-unknown-linux-musl'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y musl-tools musl-dev
+        run: sudo apt-get update && sudo apt-get install -y musl-tools musl-dev
 
-      - name: Install cross-compilation tools
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-multilib libc6-dev-i386
-          cargo install cross --version 0.2.5 || true
-
-      - name: Cache cargo registry
+      - name: Cache dependencies
         uses: actions/cache@v4
         with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Cache cargo index
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/git
-          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Cache cargo build
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: ${{ runner.os }}-${{ matrix.target }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build binary
-        run: |
-          if [[ "${{ runner.os }}" == "Linux" && "${{ matrix.target }}" != "x86_64-unknown-linux-gnu" ]]; then
-            if command -v cross &> /dev/null; then
-              cross build --release --target ${{ matrix.target }}
-            else
-              cargo build --release --target ${{ matrix.target }}
-            fi
-          else
-            cargo build --release --target ${{ matrix.target }}
-          fi
+        run: cargo build --release --target ${{ matrix.target }}
 
       - name: Verify binary exists
         id: verify
+        shell: bash
         run: |
-          BINARY="target/${{ matrix.target }}/release/${{ matrix.artifact_name }}"
-          if [[ -f "$BINARY" ]]; then
-            SIZE=$(stat -c%s "$BINARY" 2>/dev/null || stat -f%z "$BINARY" 2>/dev/null)
-            echo "Binary found ($SIZE bytes): $BINARY"
-            echo "exists=true" >> $GITHUB_OUTPUT
-            echo "size=$SIZE" >> $GITHUB_OUTPUT
-          else
-            echo "ERROR: Binary not found: $BINARY"
+          BINARY="target/${{ matrix.target }}/release/${{ matrix.artifact }}"
+          if [[ ! -f "$BINARY" ]]; then
+            echo "ERROR: Binary not found at $BINARY"
             exit 1
           fi
+          SIZE=$(stat -c%s "$BINARY" 2>/dev/null || stat -f%z "$BINARY" 2>/dev/null)
+          echo "Binary size: ${SIZE} bytes"
+          echo "binary_path=$BINARY" >> $GITHUB_OUTPUT
 
-      - name: Strip binary (Linux/macOS)
-        if: runner.os != 'Windows' && steps.verify.outputs.exists == 'true'
+      - name: Strip binary (Linux/macOS only)
+        if: runner.os != 'Windows'
         run: |
-          BINARY="target/${{ matrix.target }}/release/${{ matrix.artifact_name }}"
+          BINARY="target/${{ matrix.target }}/release/${{ matrix.artifact }}"
           strip "$BINARY" 2>/dev/null || echo "strip skipped (non-ELF binary)"
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           upload_url: ${{ needs.release.outputs.upload_url }}
-          files: target/${{ matrix.target }}/release/${{ matrix.artifact_name }}
+          files: target/${{ matrix.target }}/release/${{ matrix.artifact }}
           tag_name: ${{ needs.release.outputs.tag_name }}
-          draft: false
-          prerelease: ${{ contains(needs.release.outputs.tag_name, '-alpha') || contains(needs.release.outputs.tag_name, '-beta') || contains(needs.release.outputs.tag_name, '-rc') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload workflow artifact (backup)
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.asset_name }}
-          path: target/${{ matrix.target }}/release/${{ matrix.artifact_name }}
-          retention-days: 7
+          name: ${{ matrix.asset }}
+          path: target/${{ matrix.target }}/release/${{ matrix.artifact }}
+          retention-days: 3
 
   publish:
     name: Publish to crates.io
     needs: [test, release]
     runs-on: ubuntu-latest
-    # Stable release publications only (no -alpha/-beta/-rc)
-    if: ${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-alpha') && !contains(github.ref_name, '-beta') && !contains(github.ref_name, '-rc') }}
+    # Only for stable tag (not pre-release)
+    if: ${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-alpha') && !contains(github.ref_name, '-beta') && !contains(github.ref_name, '-rc') && !contains(github.ref_name, '-dev') }}
     steps:
       - uses: actions/checkout@v4
 
