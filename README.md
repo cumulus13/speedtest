@@ -62,7 +62,7 @@ sudo cp target/release/speedtest /usr/local/bin/
 ### From Crates.io
 
 ```bash
-cargo install speedtest
+cargo install speedtester
 ```
 
 ## Usage
