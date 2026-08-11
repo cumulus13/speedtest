@@ -665,7 +665,7 @@ impl Speedtest {
     }
 }
 
-use crate::utils::cache_buster;
+// use crate::utils::cache_buster;
 
 #[cfg(test)]
 mod tests {

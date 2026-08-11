@@ -25,6 +25,9 @@ jobs:
         with:
           components: rustfmt
       
+      - name: Formatting
+        run: cargo fmt --all
+      
       - name: Check formatting
         run: cargo fmt --all -- --check
 
@@ -43,6 +46,9 @@ jobs:
           components: clippy
       
       - name: Run clippy
+        run: cargo clippy --fix --all-features --allow-dirty
+
+      - name: Run clippy check
         run: cargo clippy --all-targets --all-features -- -D warnings
 
   test:
