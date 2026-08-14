@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.16] - 2026-08-14
+
+### Fixed
+- musl release build (`x86_64-unknown-linux-musl`) failed because `openssl-sys`
+  cannot cross-compile without a target sysroot. Switched `reqwest` to
+  `rustls-tls` (disabling the default `native-tls`/OpenSSL backend), removing
+  the OpenSSL dependency entirely.
+- Security audit failure: bumped `quick-xml` from `0.31` to `0.41` to resolve
+  RUSTSEC-2026-0194 (quadratic-time duplicate attribute check) and
+  RUSTSEC-2026-0195 (unbounded namespace-declaration allocation), both high
+  severity (7.5).
+- Clippy `-D warnings` failures in `src/speedtest.rs`: replaced
+  `if self.config.is_some() { ... .unwrap() }` with `if let Some(ref config)`,
+  and `if let Ok(_) = ...` with `.is_ok()`.
+- Clippy matrix jobs (`windows-latest`, `macos-latest`) were being cancelled
+  whenever `ubuntu-latest` failed, since `fail-fast` defaulted to `true`. Set
+  `fail-fast: false` so each OS reports its own result independently.
+
 ## [1.0.0] - 2025-02-08
 
 ### Added

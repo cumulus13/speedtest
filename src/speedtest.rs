@@ -44,8 +44,8 @@ impl Speedtest {
     }
 
     pub fn get_config(&mut self) -> Result<&Config> {
-        if self.config.is_some() {
-            return Ok(self.config.as_ref().unwrap());
+        if let Some(ref config) = self.config {
+            return Ok(config);
         }
 
         let xml = self
@@ -622,7 +622,7 @@ impl Speedtest {
                             data_index = i; // Start from this thread's offset again
                         }
                         
-                        if let Ok(_) = client.post(&url, data_chunk[data_index].clone()) {
+                        if client.post(&url, data_chunk[data_index].clone()).is_ok() {
                             total_bytes.fetch_add(data_chunk[data_index].len() as u64, Ordering::Relaxed);
                         }
                         

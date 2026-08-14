@@ -12,12 +12,14 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration; 
 use clap_version_flag::colorful_version;
+use clap_color_help::default_styles;
 
 /// Command line interface for testing internet bandwidth using speedtest.net
 #[derive(Parser, Debug)]
 #[command(author = "Hadi Cahyadi <cumulus13@gmail.com>")]
 // #[command(version = "1.0.0")]
 #[command(disable_version_flag = true)]
+#[command(style = default_styles())]
 #[command(about = "Command line interface for testing internet bandwidth using speedtest.net", long_about = "Command-line interface for testing internet bandwidth using speedtest.net, written in Rust. Providing better performance, lower memory usage, and cross-platform compatibility.")]
 struct Args {
     #[arg[short = 'V', long = "version", action = ArgAction::SetTrue]]
