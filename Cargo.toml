@@ -5,7 +5,7 @@ bin = [
 
 [package]
 name = "speedtester"
-version = "1.0.16"
+version = "1.0.17"
 authors = [
     "Hadi Cahyadi <cumulus13@gmail.com>",
 ]
@@ -55,14 +55,11 @@ calp-color-help = "0.1.3"
 
 [dependencies.reqwest]
 version = "0.12"
-default-features = false
 features = [
     "blocking",
     "gzip",
     "json",
-    "rustls-tls",
-    "charset",
-    "http2",
+    "native-tls-vendored",
 ]
 
 [dependencies.tokio]
