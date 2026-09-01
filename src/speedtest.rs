@@ -58,7 +58,7 @@ impl Speedtest {
         use std::collections::HashMap;
 
         let mut reader = Reader::from_str(&xml);
-        reader.trim_text(true);
+        reader.config_mut().trim_text(true);
 
         let mut client_attrs: HashMap<String, String> = HashMap::new();
         let mut server_config_attrs: HashMap<String, String> = HashMap::new();
@@ -268,7 +268,7 @@ impl Speedtest {
         use quick_xml::Reader;
 
         let mut reader = Reader::from_str(&xml);
-        reader.trim_text(true);
+        reader.config_mut().trim_text(true);
 
         let config = self.config.as_ref()
             .ok_or_else(|| SpeedtestError::ConfigRetrieval("Config not loaded".to_string()))?;

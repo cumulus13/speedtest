@@ -1,11 +1,10 @@
 bin = [
     { name = "speedtest", path = "src/main.rs" },
-    { name = "debug-xml", path = "examples/debug-xml.rs" },
 ]
 
 [package]
 name = "speedtester"
-version = "1.0.18"
+version = "1.0.19"
 authors = [
     "Hadi Cahyadi <cumulus13@gmail.com>",
 ]
