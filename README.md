@@ -173,20 +173,50 @@ Upload: 45.67 Mbit/s
 
 ## Supported Platforms
 
+CI builds and uploads a binary for each row below on every tagged release ("Built" = compiled and packaged by CI; it is not the same as device-tested).
+
 | Platform | Architecture | Status |
 |----------|--------------|--------|
-| Linux | x86_64 | ✅ Tested |
-| Linux | x86_64 (musl) | ✅ Tested |
-| Linux | aarch64 | ✅ Tested |
-| Linux | armv7 | ✅ Tested |
-| Linux | i686 | ✅ Tested |
-| Windows | x86_64 | ✅ Tested |
-| Windows | i686 | ✅ Tested |
-| Windows | aarch64 | ✅ Built |
-| macOS | x86_64 | ✅ Tested |
-| macOS | aarch64 (M1/M2) | ✅ Tested |
-| FreeBSD | x86_64 | ✅ Built |
-| NetBSD | x86_64 | ✅ Built |
+| Linux | x86_64 (glibc) | ✅ Built |
+| Linux | x86_64 (musl) | ✅ Built |
+| Linux | aarch64 (glibc) | ✅ Built |
+| Linux | aarch64 (musl) | ✅ Built |
+| Linux | armv7 (glibc) | ✅ Built |
+| Linux | armv7 (musl) | ✅ Built |
+| Linux | i686 (glibc) | ✅ Built |
+| Android / Termux | aarch64 | ✅ Built |
+| Android / Termux | armv7 | ✅ Built |
+| Android / Termux | i686 | ✅ Built |
+| Android / Termux | x86_64 | ✅ Built |
+| Windows | x86_64 | ✅ Built |
+| Windows | aarch64 | ⚠️ Best-effort (not verified) |
+| macOS | x86_64 | ✅ Built |
+| macOS | aarch64 (M1/M2) | ✅ Built |
+| FreeBSD | x86_64 | ⚠️ Best-effort (not verified) |
+
+### Android / Termux
+
+[#android--termux](#android--termux)
+
+Two options:
+
+**Prebuilt binary** (matches your device's architecture — check with `uname -m`; `aarch64` is by far the most common on modern phones):
+
+```
+curl -L https://github.com/cumulus13/speedtest/releases/latest/download/speedtest-android-aarch64 -o speedtest
+chmod +x speedtest
+mv speedtest $PREFIX/bin/
+```
+
+**Build from source directly in Termux** (simplest, avoids any ABI mismatch):
+
+```
+pkg update && pkg install rust
+git clone https://github.com/cumulus13/speedtest.git
+cd speedtest
+cargo build --release
+cp target/release/speedtest $PREFIX/bin/
+```
 
 ## Performance Comparison
 

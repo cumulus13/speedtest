@@ -28,6 +28,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # Native x86_64 Linux builds (no cross/docker needed - fast path)
   build-linux:
     needs: release
     runs-on: ubuntu-latest
@@ -72,6 +73,129 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # Foreign-arch Linux builds via `cross` (uses Docker images with the right
+  # linker/sysroot preinstalled, avoids hand-rolling CC_<target> env vars).
+  build-linux-cross:
+    needs: release
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-unknown-linux-gnu
+            asset: speedtest-linux-aarch64
+          - target: aarch64-unknown-linux-musl
+            asset: speedtest-linux-aarch64-musl
+          - target: armv7-unknown-linux-gnueabihf
+            asset: speedtest-linux-armv7
+          - target: armv7-unknown-linux-musleabihf
+            asset: speedtest-linux-armv7-musl
+          - target: i686-unknown-linux-gnu
+            asset: speedtest-linux-i686
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
+
+      - name: Build
+        run: cross build --release --target ${{ matrix.target }}
+
+      - name: Rename and prepare assets
+        run: |
+          mkdir -p dist
+          cp target/${{ matrix.target }}/release/speedtest dist/${{ matrix.asset }}
+          chmod +x dist/${{ matrix.asset }}
+          strip dist/${{ matrix.asset }} 2>/dev/null || true
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          upload_url: ${{ needs.release.outputs.upload_url }}
+          files: dist/${{ matrix.asset }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Android / Termux builds via `cross` (Android NDK toolchains inside the
+  # cross Docker images). These binaries also run directly under Termux,
+  # since Termux uses the same Bionic ABI/triples as the Android NDK.
+  build-android:
+    needs: release
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-linux-android
+            asset: speedtest-android-aarch64
+          - target: armv7-linux-androideabi
+            asset: speedtest-android-armv7
+          - target: i686-linux-android
+            asset: speedtest-android-i686
+          - target: x86_64-linux-android
+            asset: speedtest-android-x86_64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
+
+      - name: Build
+        run: cross build --release --target ${{ matrix.target }}
+
+      - name: Rename and prepare assets
+        run: |
+          mkdir -p dist
+          cp target/${{ matrix.target }}/release/speedtest dist/${{ matrix.asset }}
+          chmod +x dist/${{ matrix.asset }}
+          strip dist/${{ matrix.asset }} 2>/dev/null || true
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          upload_url: ${{ needs.release.outputs.upload_url }}
+          files: dist/${{ matrix.asset }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Best-effort: FreeBSD via cross. Not covered by any automated test beyond
+  # "it compiles" - flag any failures here rather than assuming it's fine.
+  build-freebsd:
+    needs: release
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
+
+      - name: Build
+        run: cross build --release --target x86_64-unknown-freebsd
+
+      - name: Rename and prepare assets
+        run: |
+          mkdir -p dist
+          cp target/x86_64-unknown-freebsd/release/speedtest dist/speedtest-freebsd-x86_64
+          chmod +x dist/speedtest-freebsd-x86_64
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          upload_url: ${{ needs.release.outputs.upload_url }}
+          files: dist/speedtest-freebsd-x86_64
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   build-windows:
     needs: release
     runs-on: windows-latest
@@ -97,6 +221,39 @@ jobs:
         with:
           upload_url: ${{ needs.release.outputs.upload_url }}
           files: dist/speedtest-windows-x86_64.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Best-effort: Windows on ARM64. windows-latest carries the MSVC ARM64
+  # toolchain, so this cross-compiles natively without a separate cross
+  # tool - but it's untested here, flag failures rather than assuming.
+  build-windows-arm64:
+    needs: release
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: aarch64-pc-windows-msvc
+
+      - name: Build
+        run: cargo build --release --target aarch64-pc-windows-msvc
+
+      - name: Rename and prepare assets
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp target/aarch64-pc-windows-msvc/release/speedtest.exe dist/speedtest-windows-aarch64.exe
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          upload_url: ${{ needs.release.outputs.upload_url }}
+          files: dist/speedtest-windows-aarch64.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
